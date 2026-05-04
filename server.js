@@ -1,18 +1,16 @@
-import dotenv from "dotenv";
-import express from "express";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import Database from "better-sqlite3";
-import axios from "axios";
+require("dotenv").config();
 
-dotenv.config();
+const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const Database = require("better-sqlite3");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 
 const db = new Database("database.sqlite");
-
-const SECRET = process.env.JWT_SECRET || "secret123";
+const SECRET = "secret123";
 
 /* ========================
    DB
@@ -27,14 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 `).run();
 
 /* ========================
-   HEALTH CHECK
-======================== */
-app.get("/", (req, res) => {
-  res.send("🚀 AI Sales Analyzer API is running");
-});
-
-/* ========================
-   ANALYZE ENDPOINT
+   ANALYZE (FINAL OPTIMIZED PROMPT)
 ======================== */
 app.post("/analyze", async (req, res) => {
   const { text } = req.body;
@@ -49,6 +40,7 @@ app.post("/analyze", async (req, res) => {
       {
         model: "openai/gpt-4o",
 
+        // 🔥 مهم جدًا لتقليل الثبات
         temperature: 0.3,
         max_tokens: 1500,
 
@@ -59,49 +51,76 @@ app.post("/analyze", async (req, res) => {
 أنت خبير عالمي في تحليل محادثات المبيعات وخدمة العملاء.
 
 🎯 الهدف:
-تحليل دقيق يعتمد فقط على النص الحقيقي بدون تخمين.
+تحليل دقيق جدًا يعتمد فقط على النص الحقيقي بدون أي تخمين.
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-🚨 قواعد صارمة:
+🚨 قواعد إلزامية:
 ━━━━━━━━━━━━━━━━━━━━━━━
-- الرد JSON فقط بدون شرح
-- اللغة العربية فقط
-- ممنوع Markdown
-- ممنوع اختراع معلومات
-- الاقتباسات لازم تكون حرفية 100%
+- الرد JSON فقط بدون أي شرح خارج JSON
+- اللغة العربية فقط 100%
+- ممنوع أي لغة أخرى
+- ممنوع Markdown نهائياً
+- لا يجوز اختراع أي جملة
+- المحادثة نصية فقط (لا صور)
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-📊 التقييم:
+📊 نظام التقييم الإجباري:
 ━━━━━━━━━━━━━━━━━━━━━━━
-- 10 = إغلاق صفقة مثالي
-- 8-9 = ممتاز
-- 6-7 = متوسط
-- 4-5 = ضعيف
-- 1-3 = فشل
+- 10 = إغلاق صفقة مثالي + إقناع قوي بدون أخطاء
+- 8-9 = أداء ممتاز مع أخطاء بسيطة
+- 6-7 = أداء متوسط مع مشاكل في الإقناع
+- 4-5 = ضعف واضح في إدارة العميل
+- 1-3 = فشل في الإقناع أو خسارة فرصة
+
+⚠️ ممنوع إعطاء رقم افتراضي مثل 7 بدون سبب واضح من النص
+
+التقييم يجب أن يعتمد على:
+- قوة الإقناع
+- التعامل مع الاعتراضات
+- إدارة العميل
+- وضوح العرض
+- سرعة الرد
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-📦 الشكل المطلوب:
+📌 المطلوب:
+━━━━━━━━━━━━━━━━━━━━━━━
+1) تحليل عميق للمحادثة
+2) استخراج الأخطاء الحقيقية فقط
+3) كل خطأ يجب أن يحتوي على اقتباس حرفي 100%
+4) شرح سبب الخطأ
+5) طريقة تصحيح واضحة
+6) نصائح تطوير
+
+━━━━━━━━━━━━━━━━━━━━━━━
+📦 الشكل الإلزامي:
+━━━━━━━━━━━━━━━━━━━━━━━
 
 {
   "rating": 0-10,
-  "ratingJustification": "",
+  "ratingJustification": "سبب واضح للتقييم بناء على المحادثة",
+
   "customerType": "مهتم / متردد / غير جاد / جاهز للشراء",
+
   "salesSkillScore": 0-10,
-  "closingProbability": "%",
-  "analysis": "",
+  "closingProbability": "٪",
+
+  "analysis": "تحليل عربي عميق وصريح",
+
   "errors": [
     {
-      "quote": "",
-      "problem": "",
-      "fix": ""
+      "quote": "نص حرفي من المحادثة",
+      "problem": "سبب الخطأ",
+      "fix": "طريقة التصحيح"
     }
   ],
+
   "positives": [],
   "negatives": [],
   "improvementTips": []
 }
 
-🚨 أي خطأ بدون اقتباس = مرفوض
+🚨 قاعدة ذهبية:
+إذا لم يوجد اقتباس حقيقي → لا تكتب خطأ
 `
           },
           {
@@ -114,32 +133,26 @@ app.post("/analyze", async (req, res) => {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://your-app.onrender.com",
-          "X-Title": "AI Sales Analyzer"
+          "HTTP-Referer": "http://localhost",
+          "X-Title": "Sales Analyzer"
         }
       }
     );
 
     let output = response.data.choices[0].message.content;
 
-    // تنظيف markdown
+    // تنظيف أي Markdown
     output = output.replace(/```json|```/g, "").trim();
 
     const start = output.indexOf("{");
     const end = output.lastIndexOf("}");
-
-    if (start === -1 || end === -1) {
-      return res.status(500).json({
-        error: "Invalid AI response format"
-      });
-    }
 
     const json = JSON.parse(output.substring(start, end + 1));
 
     res.json(json);
 
   } catch (err) {
-    console.log("ERROR:", err.response?.data || err.message);
+    console.log("OPENROUTER ERROR:", err.response?.data || err.message);
 
     res.status(500).json({
       success: false,
@@ -149,10 +162,8 @@ app.post("/analyze", async (req, res) => {
 });
 
 /* ========================
-   START SERVER
+   SERVER
 ======================== */
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port " + PORT);
+app.listen(3000, "0.0.0.0", () => {
+  console.log("Server running on port 3000");
 });
