@@ -3,19 +3,24 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-// endpoint الرئيسي
+// 👇 الصفحة الرئيسية
+app.get("/", (req, res) => {
+  res.send("🚀 AI Analyzer API is running");
+});
+
+// 👇 التحليل
 app.post("/analyze", async (req, res) => {
   const { text } = req.body;
 
-  // هنا لاحقاً نحط AI حقيقي
   res.json({
     rating: 8,
     analysis: "تحليل تجريبي للنص",
-    positives: ["أسلوب جيد", "محاولة إقناع واضحة"],
+    positives: ["أسلوب جيد"],
     negatives: ["تأخر في الرد"],
     criticalMistakes: [],
-    improvementTips: ["اختصر الكلام", "ارفع سرعة الرد"]
+    improvementTips: ["سرّع الرد"]
   });
 });
 
-app.listen(3000, () => console.log("Server running on 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
