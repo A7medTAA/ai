@@ -27,7 +27,7 @@ app.post("/analyze", async (req, res) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "google/gemini-1.5-flash",
+        model: "google/gemini-2.5-flash",
 
         temperature: 0.3,
         max_tokens: 1500,
