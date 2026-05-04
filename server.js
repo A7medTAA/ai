@@ -10,11 +10,11 @@ app.use(express.json());
    HEALTH CHECK
 ======================== */
 app.get("/", (req, res) => {
-  res.send("AI Server is running 🚀");
+  res.send("AI Server is running 🚀 (Gemini Mode)");
 });
 
 /* ========================
-   ANALYZE
+   ANALYZE (GEMINI)
 ======================== */
 app.post("/analyze", async (req, res) => {
   const { text } = req.body;
@@ -25,17 +25,14 @@ app.post("/analyze", async (req, res) => {
 
   try {
     const response = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
-        model: "google/gemini-2.5-flash",
-
-        temperature: 0.3,
-        max_tokens: 1500,
-
-        messages: [
+        contents: [
           {
-  role: "system",
-  content: `
+            role: "user",
+            parts: [
+              {
+                text: `
 أنت خبير عالمي في تحليل محادثات المبيعات وخدمة العملاء.
 
 🎯 الهدف:
@@ -49,49 +46,7 @@ app.post("/analyze", async (req, res) => {
 - ممنوع أي لغة أخرى
 - ممنوع Markdown نهائياً
 - لا يجوز اختراع أي جملة
-- المحادثة نصية فقط (لا صور)
-
-━━━━━━━━━━━━━━━━━━━━━━━
-👤 نطاق التحليل (مهم جدًا):
-━━━━━━━━━━━━━━━━━━━━━━━
-هذا التحليل موجه فقط لتقييم أداء موظف المبيعات.
-
-🚫 ممنوع تمامًا تقديم أي ملاحظات أو نصائح خارج نطاق المبيعات مثل:
-- إدارة المخزون
-- توفير المنتجات أو الألوان
-- التسعير الداخلي للشركة
-- العمليات اللوجستية أو التشغيلية
-- أي قرارات تخص الإدارة أو الشركة
-
-✔️ المسموح فقط:
-- الإقناع
-- التعامل مع العميل
-- الرد على الاعتراضات
-- أسلوب التواصل
-- إغلاق الصفقة
-- سرعة الاستجابة
-- جودة العرض البيعي
-
-━━━━━━━━━━━━━━━━━━━━━━━
-📊 نظام التقييم الإجباري:
-━━━━━━━━━━━━━━━━━━━━━━━
-- 10 = إغلاق صفقة مثالي + إقناع قوي بدون أخطاء
-- 8-9 = أداء ممتاز مع أخطاء بسيطة
-- 6-7 = أداء متوسط مع مشاكل في الإقناع
-- 4-5 = ضعف واضح في إدارة العميل
-- 1-3 = فشل في الإقناع أو خسارة فرصة
-
-⚠️ ممنوع إعطاء رقم افتراضي بدون سبب واضح من النص
-
-━━━━━━━━━━━━━━━━━━━━━━━
-📌 المطلوب:
-━━━━━━━━━━━━━━━━━━━━━━━
-1) تحليل عميق لأداء موظف المبيعات فقط
-2) استخراج أخطاء المبيعات فقط
-3) كل خطأ يجب أن يحتوي على اقتباس حرفي 100%
-4) شرح سبب الخطأ من منظور مبيعات فقط
-5) طريقة تصحيح لسلوك المبيعات فقط
-6) نصائح تطوير مهارية في البيع فقط
+- المحادثة نصية فقط
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 📦 الشكل الإلزامي:
@@ -116,29 +71,25 @@ app.post("/analyze", async (req, res) => {
   "improvementTips": []
 }
 
-🚨 قاعدة ذهبية:
-أي نصيحة ليست مرتبطة مباشرة بأداء موظف المبيعات = تعتبر خطأ ويجب عدم ذكرها.
-`
-},
-{
-  role: "user",
-  content: text
-}
+━━━━━━━━━━━━━━━━━━━━━━━
+النص:
+${text}
+                `
+              }
+            ]
+          }
         ]
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://ai-bgh5.onrender.com",
-          "X-Title": "Sales Analyzer"
+          "Content-Type": "application/json"
         }
       }
     );
 
-    let output = response.data.choices[0].message.content;
+    let output = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    // تنظيف Markdown
+    // تنظيف أي Markdown
     output = output.replace(/```json|```/g, "").trim();
 
     const start = output.indexOf("{");
@@ -146,29 +97,20 @@ app.post("/analyze", async (req, res) => {
 
     if (start === -1 || end === -1) {
       return res.status(500).json({
-        error: "Invalid AI response",
+        error: "Invalid Gemini response",
         raw: output
       });
     }
 
-    let json;
-
-    try {
-      json = JSON.parse(output.substring(start, end + 1));
-    } catch (e) {
-      return res.status(500).json({
-        error: "JSON parse failed",
-        raw: output
-      });
-    }
+    const json = JSON.parse(output.substring(start, end + 1));
 
     return res.json(json);
 
   } catch (err) {
-    console.log("🔥 OPENROUTER ERROR:", err.response?.data || err.message);
+    console.log("🔥 GEMINI ERROR:", err.response?.data || err.message);
 
     return res.status(500).json({
-      error: "AI request failed",
+      error: "Gemini request failed",
       details: err.response?.data || err.message
     });
   }
