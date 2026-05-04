@@ -15,6 +15,11 @@ const db = new Database("database.sqlite");
 const SECRET = process.env.JWT_SECRET || "secret123";
 
 /* ========================
+   DEBUG (مهم جدًا)
+======================== */
+console.log("OPENROUTER KEY LOADED:", !!process.env.OPENROUTER_API_KEY);
+
+/* ========================
    DB
 ======================== */
 db.prepare(`
@@ -53,7 +58,10 @@ app.post("/analyze", async (req, res) => {
         messages: [
           {
             role: "system",
-            content: "أنت محلل مبيعات احترافي..."
+            content: `
+أنت محلل مبيعات احترافي.
+أعد الرد JSON فقط بدون أي نص إضافي.
+            `
           },
           {
             role: "user",
@@ -65,7 +73,7 @@ app.post("/analyze", async (req, res) => {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://your-app.onrender.com",
+          "HTTP-Referer": "https://ai-bgh5.onrender.com",
           "X-Title": "AI Analyzer"
         }
       }
@@ -73,19 +81,30 @@ app.post("/analyze", async (req, res) => {
 
     let output = response.data.choices[0].message.content;
 
+    // تنظيف Markdown
     output = output.replace(/```json|```/g, "").trim();
 
-    const json = JSON.parse(
-      output.substring(output.indexOf("{"), output.lastIndexOf("}") + 1)
-    );
+    const start = output.indexOf("{");
+    const end = output.lastIndexOf("}");
 
-    res.json(json);
+    if (start === -1 || end === -1) {
+      return res.status(500).json({
+        error: "Invalid AI response format",
+        raw: output
+      });
+    }
+
+    const json = JSON.parse(output.substring(start, end + 1));
+
+    return res.json(json);
 
   } catch (err) {
+    console.log("🔥 OPENROUTER ERROR FULL:");
     console.log(err.response?.data || err.message);
 
-    res.status(500).json({
-      error: "AI request failed"
+    return res.status(500).json({
+      error: "AI request failed",
+      details: err.response?.data || err.message
     });
   }
 });
