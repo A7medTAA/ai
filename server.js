@@ -1,35 +1,10 @@
-import dotenv from "dotenv";
-import express from "express";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import Database from "better-sqlite3";
-import axios from "axios";
+require("dotenv").config();
 
-dotenv.config();
+const express = require("express");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
-
-const db = new Database("database.sqlite");
-
-const SECRET = process.env.JWT_SECRET || "secret123";
-
-/* ========================
-   DEBUG (مهم جدًا)
-======================== */
-console.log("OPENROUTER KEY LOADED:", !!process.env.OPENROUTER_API_KEY);
-
-/* ========================
-   DB
-======================== */
-db.prepare(`
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY,
-  email TEXT UNIQUE,
-  password TEXT,
-  role TEXT
-)
-`).run();
 
 /* ========================
    HEALTH CHECK
@@ -53,15 +28,43 @@ app.post("/analyze", async (req, res) => {
       "https://openrouter.ai/api/v1/chat/completions",
       {
         model: "openai/gpt-4o",
+
         temperature: 0.3,
         max_tokens: 1500,
+
         messages: [
           {
             role: "system",
             content: `
-أنت محلل مبيعات احترافي.
-أعد الرد JSON فقط بدون أي نص إضافي.
-            `
+أنت خبير عالمي في تحليل محادثات المبيعات وخدمة العملاء.
+
+🚨 قواعد صارمة:
+- الرد JSON فقط بدون أي نص خارج JSON
+- بدون Markdown نهائياً
+- بدون شرح خارج JSON
+- لا تخترع بيانات غير موجودة
+
+📦 الشكل الإجباري:
+
+{
+  "rating": 0-10,
+  "ratingJustification": "",
+  "customerType": "",
+  "salesSkillScore": 0-10,
+  "closingProbability": "%",
+  "analysis": "",
+  "errors": [
+    {
+      "quote": "",
+      "problem": "",
+      "fix": ""
+    }
+  ],
+  "positives": [],
+  "negatives": [],
+  "improvementTips": []
+}
+`
           },
           {
             role: "user",
@@ -74,7 +77,7 @@ app.post("/analyze", async (req, res) => {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "https://ai-bgh5.onrender.com",
-          "X-Title": "AI Analyzer"
+          "X-Title": "Sales Analyzer"
         }
       }
     );
@@ -89,18 +92,26 @@ app.post("/analyze", async (req, res) => {
 
     if (start === -1 || end === -1) {
       return res.status(500).json({
-        error: "Invalid AI response format",
+        error: "Invalid AI response",
         raw: output
       });
     }
 
-    const json = JSON.parse(output.substring(start, end + 1));
+    let json;
+
+    try {
+      json = JSON.parse(output.substring(start, end + 1));
+    } catch (e) {
+      return res.status(500).json({
+        error: "JSON parse failed",
+        raw: output
+      });
+    }
 
     return res.json(json);
 
   } catch (err) {
-    console.log("🔥 OPENROUTER ERROR FULL:");
-    console.log(err.response?.data || err.message);
+    console.log("🔥 OPENROUTER ERROR:", err.response?.data || err.message);
 
     return res.status(500).json({
       error: "AI request failed",
