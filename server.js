@@ -1,21 +1,30 @@
-require("dotenv").config();
+import dotenv from "dotenv";
+import express from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import Database from "better-sqlite3";
+import axios from "axios";
 
-const express = require("express");
-const axios = require("axios");
-const rateLimit = require("express-rate-limit");
+dotenv.config();
 
 const app = express();
 app.use(express.json());
 
-/* ========================
-   RATE LIMIT (حماية API)
-======================== */
-const limiter = rateLimit({
-  windowMs: 60 * 1000, // دقيقة
-  max: 20, // 20 طلب لكل دقيقة
-});
+const db = new Database("database.sqlite");
 
-app.use("/analyze", limiter);
+const SECRET = process.env.JWT_SECRET || "secret123";
+
+/* ========================
+   DB
+======================== */
+db.prepare(`
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  email TEXT UNIQUE,
+  password TEXT,
+  role TEXT
+)
+`).run();
 
 /* ========================
    HEALTH CHECK
@@ -34,8 +43,6 @@ app.post("/analyze", async (req, res) => {
     return res.status(400).json({ message: "text is required" });
   }
 
-  const startTime = Date.now();
-
   try {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -52,7 +59,7 @@ app.post("/analyze", async (req, res) => {
 أنت خبير عالمي في تحليل محادثات المبيعات وخدمة العملاء.
 
 🎯 الهدف:
-تحليل المحادثة بدقة عالية بدون تخمين.
+تحليل دقيق يعتمد فقط على النص الحقيقي بدون تخمين.
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 🚨 قواعد صارمة:
@@ -61,7 +68,7 @@ app.post("/analyze", async (req, res) => {
 - اللغة العربية فقط
 - ممنوع Markdown
 - ممنوع اختراع معلومات
-- لازم الاقتباسات تكون حرفية 100%
+- الاقتباسات لازم تكون حرفية 100%
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 📊 التقييم:
@@ -73,8 +80,7 @@ app.post("/analyze", async (req, res) => {
 - 1-3 = فشل
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-📦 المطلوب:
-━━━━━━━━━━━━━━━━━━━━━━━
+📦 الشكل المطلوب:
 
 {
   "rating": 0-10,
@@ -108,7 +114,7 @@ app.post("/analyze", async (req, res) => {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "http://localhost",
+          "HTTP-Referer": "https://your-app.onrender.com",
           "X-Title": "AI Sales Analyzer"
         }
       }
@@ -116,7 +122,7 @@ app.post("/analyze", async (req, res) => {
 
     let output = response.data.choices[0].message.content;
 
-    // تنظيف أي Markdown
+    // تنظيف markdown
     output = output.replace(/```json|```/g, "").trim();
 
     const start = output.indexOf("{");
@@ -130,10 +136,7 @@ app.post("/analyze", async (req, res) => {
 
     const json = JSON.parse(output.substring(start, end + 1));
 
-    res.json({
-      ...json,
-      responseTime: Date.now() - startTime
-    });
+    res.json(json);
 
   } catch (err) {
     console.log("ERROR:", err.response?.data || err.message);
@@ -146,7 +149,7 @@ app.post("/analyze", async (req, res) => {
 });
 
 /* ========================
-   SERVER START
+   START SERVER
 ======================== */
 const PORT = process.env.PORT || 3000;
 
